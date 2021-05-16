@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from plotmanager.library.utilities.processes import get_manager_processes, get_chia_drives
 
 ram_usage_max = 0
+cpu_usage_max = 0
 drive_usage_max = {}
 
 def _get_row_info(pid, running_work, view_settings):
@@ -137,7 +138,12 @@ def print_view(jobs, running_work, analysis, drives, next_log_check, view_settin
     if view_settings.get('include_drive_info'):
         print(drive_data)
     if view_settings.get('include_cpu'):
-        print(f'CPU Usage: {psutil.cpu_percent()}%')
+        global cpu_usage_max
+        cpu_usage = psutil.cpu_percent()
+        if cpu_usage_max < cpu_usage:
+            cpu_usage_max = cpu_usage
+
+        print(f'CPU Usage: {cpu_usage}% (max:{cpu_usage_max}%)')
     if view_settings.get('include_ram'):
         ram_usage = psutil.virtual_memory()
 
