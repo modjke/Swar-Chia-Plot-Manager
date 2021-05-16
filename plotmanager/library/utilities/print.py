@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 
 from plotmanager.library.utilities.processes import get_manager_processes, get_chia_drives
 
+ram_usage_max = 0
+drive_usage_max = {}
 
 def _get_row_info(pid, running_work, view_settings):
     work = running_work[pid]
@@ -89,8 +91,10 @@ def get_job_data(jobs, running_work, view_settings):
 
 
 def get_drive_data(drives):
+    global drive_usage_max
+
     chia_drives = get_chia_drives()
-    headers = ['type', 'drive', 'used', 'total', 'percent', 'plots']
+    headers = ['type', 'drive', 'used', 'total', 'percent', 'max percent', 'plots']
     rows = [headers]
     for drive_type, drives in drives.items():
         for drive in drives:
@@ -98,9 +102,16 @@ def get_drive_data(drives):
                 usage = psutil.disk_usage(drive)
             except FileNotFoundError:
                 continue
+
+            if drive not in drive_usage_max:
+                drive_usage_max[drive] = usage.percent
+            else:
+                if drive_usage_max[drive] < usage.percent:
+                    drive_usage_max[drive] = usage.percent
+
             rows.append([drive_type, drive, f'{pretty_print_bytes(usage.used, "tb", 2, "TiB")}',
                          f'{pretty_print_bytes(usage.total, "tb", 2, "TiB")}', f'{usage.percent}%',
-                         str(chia_drives[drive_type].get(drive, '?'))])
+                         f'{drive_usage_max[drive]}%', str(chia_drives[drive_type].get(drive, '?'))])
     return pretty_print_table(rows)
 
 
@@ -129,8 +140,13 @@ def print_view(jobs, running_work, analysis, drives, next_log_check, view_settin
         print(f'CPU Usage: {psutil.cpu_percent()}%')
     if view_settings.get('include_ram'):
         ram_usage = psutil.virtual_memory()
+
+        global ram_usage_max
+        if ram_usage_max < ram_usage.percent :
+            ram_usage_max = ram_usage.percent
+
         print(f'RAM Usage: {pretty_print_bytes(ram_usage.used, "gb")}/{pretty_print_bytes(ram_usage.total, "gb", 2, "GiB")}'
-              f'({ram_usage.percent}%)')
+              f'({ram_usage.percent}%) (max:{ram_usage_max}%)')
     print()
     if view_settings.get('include_plot_stats'):
         print(f'Plots Completed Yesterday: {analysis["summary"].get(datetime.now().date() - timedelta(days=1), 0)}')
